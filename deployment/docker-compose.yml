@@ -35,7 +35,15 @@ services:
       - "storage"
     network_mode: "host"
 
-
+  dashboard:
+    image: dashboard:latest
+    restart: always
+    ports:
+    - "3000:3000"
+    depends_on:
+    - "processing"
+    - "audit_log"
+    
   zookeeper:
     image: wurstmeister/zookeeper
     restart: always
