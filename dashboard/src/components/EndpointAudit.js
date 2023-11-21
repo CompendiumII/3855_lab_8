@@ -4,10 +4,12 @@ import '../App.css';
 export default function EndpointAudit(props) {
     const [isLoaded, setIsLoaded] = useState(false);
     const [log, setLog] = useState(null);
-    const [error, setError] = useState(null)
-	const rand_val = Math.floor(Math.random() * 100); // Get a random event from the event store
+    const [error, setError] = useState(null);
+    const [index, setIndex] = useState(null);
 
     const getAudit = () => {
+        const rand_val = Math.floor(Math.random() * 100); // Get a random event from the event store
+        setIndex(rand_val);
         fetch(`http://kevin-3855.eastus.cloudapp.azure.com:8110/${props.endpoint}?index=${rand_val}`)
             .then(res => res.json())
             .then((result)=>{
@@ -32,7 +34,7 @@ export default function EndpointAudit(props) {
         
         return (
             <div>
-                <h3>{props.endpoint}-{rand_val}</h3>
+                <h3>{props.endpoint}-{index}</h3>
                 {JSON.stringify(log)}
             </div>
         )

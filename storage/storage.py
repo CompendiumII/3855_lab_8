@@ -2,6 +2,7 @@ import connexion
 from connexion import NoContent
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy import and_
 from base import Base
 from record_ability import RecordAbility
 from record_item import RecordItem
@@ -12,6 +13,7 @@ import json
 from pykafka import KafkaClient
 from pykafka.common import OffsetType
 from threading import Thread
+import time
 
 with open('app_conf.yml', 'r') as f:
      app_config = yaml.safe_load(f.read())
@@ -27,13 +29,15 @@ with open('log_conf.yml', 'r') as f:
     logging.config.dictConfig(log_config)
 
 
-def get_item_usage(timestamp):
+def get_item_usage(start_timestamp, end_timestamp):
     session = DB_SESSION()
-    timestamp_datetime = datetime.datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S.%f")
+    start_timestamp_datetime = datetime.datetime.strptime(start_timestamp, "%Y-%m-%d %H:%M:%S.%f")
+    end_timestamp_datetime = datetime.datetime.strptime(end_timestamp, "%Y-%m-%d %H:%M:%S.%f")
 
-
-    readings = session.query(RecordItem).filter(RecordItem.date_created >= timestamp_datetime)
-
+    readings = session.query(RecordItem).filter(
+        and_(RecordItem.date_created >= start_timestamp_datetime,
+             RecordItem.date_created < end_timestamp_datetime))
+    
     results_list = []
     
     for reading in readings:
@@ -42,18 +46,21 @@ def get_item_usage(timestamp):
     session.close()
 
     logger.info("Query for item usages after %s returns %d results" %
-                (timestamp, len(results_list)))
+                (start_timestamp, len(results_list)))
 
     return results_list, 200
 
 
 
-def get_ability_usage(timestamp):
+def get_ability_usage(start_timestamp, end_timestamp):
     session = DB_SESSION()
-    timestamp_datetime = datetime.datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S.%f")
+    start_timestamp_datetime = datetime.datetime.strptime(start_timestamp, "%Y-%m-%d %H:%M:%S.%f")
+    end_timestamp_datetime = datetime.datetime.strptime(end_timestamp, "%Y-%m-%d %H:%M:%S.%f")
 
 
-    readings = session.query(RecordAbility).filter(RecordAbility.date_created >= timestamp_datetime).all()
+    readings = session.query(RecordAbility).filter(
+        and_(RecordAbility.date_created >= start_timestamp_datetime,
+             RecordAbility.date_created < end_timestamp_datetime))
 
     results_list = []
 
@@ -63,20 +70,38 @@ def get_ability_usage(timestamp):
 
     session.close()
 
-    logger.info("Query for ability usages after %s returns %d results" % (timestamp, len(results_list)))
+    logger.info("Query for item usages after %s returns %d results" %
+                (start_timestamp, len(results_list)))
 
     return results_list, 200
 
-def process_messages():
-    kafka_server = app_config['events']['hostname']
-    kafka_port = app_config['events']['port']
-    client = KafkaClient(hosts=f"{kafka_server}:{kafka_port}")
-    topic = client.topics[str.encode(app_config['events']['topic'])]
-    consumer = topic.get_simple_consumer(consumer_group=b'event_group', 
-                                         reset_offset_on_start=False, 
-                                         auto_offset_reset=OffsetType.LATEST)
-    
+def kafka_connection():
+    current_retries = 0
+    max_retries = app_config["kafka"]["max_retries"]
 
+    while current_retries < max_retries:
+        logger.info(f"Trying to connect to Kafka client... (ATTEMPT #{current_retries + 1})")
+        kafka_server = app_config['events']['hostname']
+        kafka_port = app_config['events']['port']
+        try:
+            client = KafkaClient(hosts=f"{kafka_server}:{kafka_port}")
+            topic = client.topics[str.encode(app_config['events']['topic'])]
+            consumer = topic.get_simple_consumer(consumer_group=b'event_group', 
+                                                reset_offset_on_start=False, 
+                                                auto_offset_reset=OffsetType.LATEST)
+            logger.info(f"Successfully connected!")
+            return consumer
+        except:
+            logger.error(f"Connection failed...")
+            logger.info(f"Retrying in {app_config['kafka']['sleep_time']} seconds...")
+            time.sleep(app_config["kafka"]["sleep_time"])
+            current_retries += 1
+        
+        logger.error(f"Failed to connect to Kafka client after {max_retries} tries...")
+        return None
+
+def process_messages():
+    consumer = kafka_connection()
     for msg in consumer:
         msg_str = msg.value.decode('utf-8')
         msg = json.loads(msg_str)

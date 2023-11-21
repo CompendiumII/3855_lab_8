@@ -8,13 +8,21 @@ paths:
     get:
       operationId: storage.get_item_usage
       parameters:
-        - name: timestamp
+        - name: start_timestamp
           in: query
           description: Limits the number of items on a page
           schema:
             type: string
             format: date-time
-            example: "2023-10-16 16:22:15.520824"
+            example: "2023-10-16T16:22:15.520824"
+
+        - name: end_timestamp
+          in: query
+          description: Limits the number of items on a page
+          schema:
+            type: string
+            format: date-time
+            example: "2023-10-17T16:22:15.520824"
       responses:
         '200':
           description: Successfully recorded an item usage
@@ -38,13 +46,20 @@ paths:
     get:
       operationId: storage.get_ability_usage
       parameters:
-        - name: timestamp
+        - name: start_timestamp
           in: query
           description: Limits the number of items on a page
           schema:
             type: string
             format: date-time
-            example: "2023-10-16 16:22:15.520824"
+            example: "2023-10-16T16:22:15.520Z"
+        - name: end_timestamp
+          in: query
+          description: Limits the number of items on a page
+          schema:
+            type: string
+            format: date-time
+            example: "2023-10-17T16:22:15.520Z"
       responses:
         '200':
           description: Successfully recorded an ability usage

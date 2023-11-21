@@ -34,13 +34,17 @@ def populate_stats():
 
     current_datetime = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
 
-    time_stamp = {
-        'timestamp': stats['last_updated']
-    }
-
     try:
-        ability_data = requests.get(app_config['ability']['url'], params=time_stamp)
-        item_data = requests.get(app_config['item']['url'], params=time_stamp)
+        ability_data = requests.get(
+            app_config['ability']['url'],
+            params={"start_timestamp": stats['last_updated'],
+                    "end_timestamp": current_datetime}
+        )
+        item_data = requests.get(
+            app_config['item']['url'],
+            params={"start_timestamp": stats['last_updated'],
+                    "end_timestamp": current_datetime}
+        )
 
     except requests.RequestException as e:
         logger.error(f"Failed to retrieve data from endpoints: {str(e)}")

@@ -8,6 +8,7 @@ import uuid
 import datetime
 import json
 from pykafka import KafkaClient
+import time
 
 with open('app_conf.yml', 'r') as f:
     app_config = yaml.safe_load(f.read())
@@ -20,15 +21,34 @@ logger = logging.getLogger('basicLogger')
 
 headers = {"Content-Type": 'application/json; charset=utf-8'}
 
+def kafka_connection():
+    current_retries = 0
+    max_retries = app_config["kafka"]["max_retries"]
 
-def record_ability_usage(body):
+    while current_retries < max_retries:
+        logger.info(f"Trying to connect to Kafka client... (ATTEMPT #{current_retries + 1})")
+        kafka_server = app_config['events']['hostname']
+        kafka_port = app_config['events']['port']
+        try:
+            client = KafkaClient(hosts=f"{kafka_server}:{kafka_port}")
+            topic = client.topics[str.encode(app_config['events']['topic'])]
+            producer = topic.get_sync_producer()
+            logger.info(f"Successfully connected!")
+            return producer
+        except:
+            logger.error(f"Connection failed...")
+            logger.info(f"Retrying in {app_config['kafka']['sleep_time']} seconds...")
+            time.sleep(app_config["kafka"]["sleep_time"])
+            current_retries += 1
+        
+        logger.error(f"Failed to connect to Kafka client after {max_retries} tries...")
+        return None
+
+producer = kafka_connection()
+
+def record_ability_usage(body, producer):
     body["trace_id"] = str(uuid.uuid4())
     logger.info(f"Event received 'RECORD_ABILITY_USAGE' with trace id {body['trace_id']}")
-    kafka_server = app_config['events']['hostname']
-    kafka_port = app_config['events']['port']
-    client = KafkaClient(hosts=f"{kafka_server}:{kafka_port}")
-    topic = client.topics[str.encode(app_config['events']['topic'])]
-    producer = topic.get_sync_producer()
     msg = { "type": "ability",
             "datetime" :
                 datetime.datetime.now().strftime(
@@ -39,14 +59,9 @@ def record_ability_usage(body):
     logger.info(f"Returned event 'RECORD_ABILITY_USAGE' response(Id: {body['trace_id']})")
     return NoContent, 201
 
-def record_item_usage(body):
+def record_item_usage(body, producer):
     body["trace_id"] = str(uuid.uuid4())
     logger.info(f"Event received 'RECORD_ITEM_USAGE' with trace id {body['trace_id']}")
-    kafka_server = app_config['events']['hostname']
-    kafka_port = app_config['events']['port']
-    client = KafkaClient(hosts=f"{kafka_server}:{kafka_port}")
-    topic = client.topics[str.encode(app_config['events']['topic'])]
-    producer = topic.get_sync_producer()
     msg = { "type": "item",
             "datetime" :
                 datetime.datetime.now().strftime(
