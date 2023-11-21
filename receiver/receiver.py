@@ -46,7 +46,7 @@ def kafka_connection():
 
 producer = kafka_connection()
 
-def record_ability_usage(body, producer):
+def record_ability_usage(body):
     body["trace_id"] = str(uuid.uuid4())
     logger.info(f"Event received 'RECORD_ABILITY_USAGE' with trace id {body['trace_id']}")
     msg = { "type": "ability",
@@ -59,7 +59,7 @@ def record_ability_usage(body, producer):
     logger.info(f"Returned event 'RECORD_ABILITY_USAGE' response(Id: {body['trace_id']})")
     return NoContent, 201
 
-def record_item_usage(body, producer):
+def record_item_usage(body):
     body["trace_id"] = str(uuid.uuid4())
     logger.info(f"Event received 'RECORD_ITEM_USAGE' with trace id {body['trace_id']}")
     msg = { "type": "item",
